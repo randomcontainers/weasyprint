@@ -1,0 +1,169 @@
+name: weasyprint
+title: WeasyPrint
+summary: Turns HTML and CSS into PDF documents laid out for print, with page sizes, margins, headers, footers and page numbers.
+homepage: https://weasyprint.org/
+# WeasyPrint, the Python packages installed with it, pip and the packages it
+# vendors, and the libraries in Pillow's wheels (see Pillow's LICENSE and
+# licenses/). Pyphen is used under LGPL-2.1-or-later. Each of its hyphenation
+# dictionaries has its own license, stated in a README_hyph_*.txt file or at
+# the top of the .dic file; a few carry no license statement. Eight are under
+# the GPL only (see licenses/pyphen-0.18.1/dictionaries/README), which gives
+# GPL-2.0-or-later and GPL-3.0-only. To fit in 256 characters the expression
+# leaves out the licenses of the other dictionaries, MIT-0 (cffi) and 0BSD
+# (liblzma), which set no conditions, Beerware, which covers a few files of
+# libbsd and libmd in the Alpine image, and the MIT-style X11 (libxcb),
+# MIT-open-group (libXau, libXdmcp) and TCL (Tcl/Tk) from Pillow's LICENSE.
+license: BSD-3-Clause AND MIT AND MIT-CMU AND Apache-2.0 AND BSD-2-Clause AND ISC AND MPL-2.0 AND PSF-2.0 AND LGPL-2.1-or-later AND GPL-2.0-or-later AND GPL-3.0-only AND FTL AND MIT-Modern-Variant AND IJG AND Zlib AND libpng-2.0 AND libtiff AND bzip2-1.0.6
+upstream:
+  source: pypi
+  project: weasyprint
+  tag-pattern: '^(\d+\.\d+)$'
+  version-template: '{1}'
+  versioning: semver
+  version: "70.0"
+  cooldown: 24h
+  publisher: Kozea/WeasyPrint
+image:
+  entrypoint: [weasyprint]
+  cmd: [--help]
+  env: {PYTHONUNBUFFERED: "1"}
+test:
+  - |
+    weasyprint --version > version.txt
+    test "$(cat version.txt)" = "WeasyPrint version $VERSION"
+  - |
+    # Pango's version is printed as an integer: 15701 is 1.57.1.
+    weasyprint --info > info.txt
+    grep -qx "WeasyPrint version: $VERSION" info.txt
+    pango=$(sed -n 's/^Pango version: //p' info.txt)
+    test "$pango" -ge 14400
+  - |
+    # HarfBuzz's subsetter is loaded at run time and is optional to WeasyPrint,
+    # which falls back to a slower fontTools subsetter without it.
+    /usr/local/lib/weasyprint/bin/python -c 'from weasyprint.text.ffi import harfbuzz_subset; assert harfbuzz_subset is not None, "libharfbuzz-subset.so.0 is not loaded"'
+    /usr/local/lib/weasyprint/bin/python -c 'import pyphen; assert pyphen.Pyphen(lang="de_DE").inserted("Silbentrennung") == "Sil-ben-tren-nung"'
+    /usr/local/lib/weasyprint/bin/python -c 'from PIL import features; missing = [f for f in ("jpg", "zlib", "webp") if not features.check(f)]; assert not missing, missing'
+  - |
+    # Two pages with text, a PNG and a JPEG, from local files only. The PDF is
+    # written uncompressed so its objects can be inspected.
+    /usr/local/lib/weasyprint/bin/python -c 'from PIL import Image; Image.new("RGB", (16, 16), (200, 30, 30)).save("red.png"); Image.new("RGB", (16, 16), (30, 30, 200)).save("blue.jpg")'
+    cat > doc.html <<'EOF'
+    <!doctype html>
+    <html lang="en">
+    <style>@page { size: A5 } h1 { break-before: page }</style>
+    <p>Text, a PNG image and a JPEG image.</p>
+    <p><img src="red.png"> <img src="blue.jpg"></p>
+    <h1>Second page</h1>
+    </html>
+    EOF
+    weasyprint --allowed-protocols file --uncompressed-pdf doc.html doc.pdf 2> doc.log
+    if grep -E '^(ERROR|WARNING):' doc.log; then exit 1; fi
+    /usr/local/lib/weasyprint/bin/python - <<'EOF'
+    import re
+    pdf = open("doc.pdf", "rb").read()
+    assert pdf.startswith(b"%PDF-"), pdf[:16]
+    assert len(re.findall(rb"/Type\s*/Page\b", pdf)) == 2, "expected 2 pages"
+    assert re.search(rb"/BaseFont\s*/[A-Z]{6}\+DejaVu", pdf), "no DejaVu font"
+    assert b"/FontFile2" in pdf, "font is not embedded"
+    assert len(re.findall(rb"/Subtype\s*/Image\b", pdf)) == 2, "expected 2 images"
+    assert re.search(rb"/Filter\s*/DCTDecode", pdf), "JPEG is not embedded as is"
+    EOF
+  - |
+    # PDF/A-3b with a user stylesheet: PDF 1.7, an sRGB output intent and the
+    # PDF/A identification in the XMP metadata.
+    printf '<h1>Archived</h1>\n' > archive.html
+    printf 'h1 { color: rgb(30, 30, 200) }\n' > print.css
+    weasyprint --stylesheet print.css --pdf-variant pdf/a-3b --uncompressed-pdf archive.html archive.pdf 2> archive.log
+    if grep -E '^(ERROR|WARNING):' archive.log; then exit 1; fi
+    /usr/local/lib/weasyprint/bin/python - <<'EOF'
+    import re
+    pdf = open("archive.pdf", "rb").read()
+    assert pdf.startswith(b"%PDF-1.7"), pdf[:16]
+    assert re.search(rb"/S\s*/GTS_PDFA1", pdf), "no PDF/A output intent"
+    assert b'pdfaid:part="3"' in pdf and b'pdfaid:conformance="B"' in pdf, "no PDF/A-3b identification"
+    EOF
+  - |
+    # A WOFF2 web font made from DejaVu Sans under another name: fontTools and
+    # Brotli decode it, and the PDF embeds it under that name.
+    /usr/local/lib/weasyprint/bin/python - "$(fc-match -f '%{file}' 'DejaVu Sans')" <<'EOF'
+    import sys
+    from fontTools import subset
+    from fontTools.ttLib import TTFont
+    font = TTFont(sys.argv[1])
+    subsetter = subset.Subsetter(subset.Options(name_IDs=["*"], name_languages=["*"]))
+    subsetter.populate(text="Web font check")
+    subsetter.subset(font)
+    names = font["name"]
+    names.names = [n for n in names.names if n.nameID not in (1, 4, 6, 16, 17)]
+    for name_id in (1, 4, 6):
+        names.setName("RcWebFont", name_id, 3, 1, 0x409)
+    font.flavor = "woff2"
+    font.save("webfont.woff2")
+    EOF
+    cat > webfont.html <<'EOF'
+    <style>
+      @font-face { font-family: RcWebFont; src: url(webfont.woff2) format("woff2") }
+      p { font-family: RcWebFont }
+    </style>
+    <p>Web font check</p>
+    EOF
+    weasyprint --allowed-protocols file --uncompressed-pdf webfont.html webfont.pdf 2> webfont.log
+    if grep -E '^(ERROR|WARNING):' webfont.log; then exit 1; fi
+    /usr/local/lib/weasyprint/bin/python -c 'import re; pdf = open("webfont.pdf", "rb").read(); assert re.search(rb"/BaseFont\s*/[A-Z]{6}\+RcWebFont", pdf), re.findall(rb"/BaseFont\s*/\S+", pdf)'
+  - |
+    # --allowed-protocols stops WeasyPrint before it opens a connection.
+    printf '<p>Blocked image: <img src="http://127.0.0.1:9/blocked.png"></p>\n' > blocked.html
+    weasyprint --allowed-protocols file blocked.html blocked.pdf 2> blocked.log
+    grep -q 'URI uses disallowed protocol: http://127.0.0.1:9/blocked.png' blocked.log
+    test "$(head -c 5 blocked.pdf)" = '%PDF-'
+  - |
+    # With only data: URLs allowed, HTML from standard input still loads an
+    # inline image, and a file: URL is refused.
+    /usr/local/lib/weasyprint/bin/python - <<'EOF'
+    import base64, io
+    from PIL import Image
+    png = io.BytesIO()
+    Image.new("RGB", (16, 16), (30, 200, 30)).save(png, "PNG")
+    data = base64.b64encode(png.getvalue()).decode()
+    with open("inline.html", "w") as f:
+        f.write(f'<p><img src="data:image/png;base64,{data}"> <img src="file:///etc/passwd"></p>\n')
+    EOF
+    weasyprint --allowed-protocols data --uncompressed-pdf - inline.pdf < inline.html 2> inline.log
+    grep -q 'URI uses disallowed protocol: file:///etc/passwd' inline.log
+    /usr/local/lib/weasyprint/bin/python -c 'import re; pdf = open("inline.pdf", "rb").read(); assert len(re.findall(rb"/Subtype\s*/Image\b", pdf)) == 1, "expected 1 image"'
+  - |
+    # HTML on standard input and the PDF on standard output.
+    printf '<h1>From standard input</h1>\n' | weasyprint - - > stdin.pdf
+    test "$(head -c 5 stdin.pdf)" = '%PDF-'
+examples:
+  - title: Convert an HTML file in the current directory to PDF
+    command: docker run --rm --user "$(id -u):$(id -g)" -v "$PWD:/work" ghcr.io/randomcontainers/weasyprint report.html report.pdf
+  - title: Convert HTML from standard input to PDF on standard output, without network access
+    command: docker run --rm -i --network none ghcr.io/randomcontainers/weasyprint - - < report.html > report.pdf
+  - title: Add a stylesheet and make a PDF/A-3b document
+    command: docker run --rm --user "$(id -u):$(id -g)" -v "$PWD:/work" ghcr.io/randomcontainers/weasyprint --stylesheet print.css --pdf-variant pdf/a-3b report.html report.pdf
+combos:
+  - with: [qpdf]
+    default: true
+    base: weasyprint
+    summary: WeasyPrint with qpdf, which encrypts, linearizes, splits and merges the PDFs that WeasyPrint writes.
+    test:
+      - |
+        qpdf --version > qpdf-version.txt
+        grep -q '^qpdf version [0-9]' qpdf-version.txt
+      - |
+        # Two pages rendered by WeasyPrint, then checked, linearized and encrypted by qpdf.
+        printf '<h1>One</h1>\n<h1 style="break-before: page">Two</h1>\n' > pages.html
+        weasyprint pages.html pages.pdf
+        qpdf --check pages.pdf > check.txt
+        grep -Fq 'No syntax or stream encoding errors found' check.txt
+        test "$(qpdf --show-npages pages.pdf)" = 2
+        qpdf --linearize pages.pdf linear.pdf
+        qpdf --check-linearization linear.pdf > linearization.txt
+        grep -Fq 'no linearization errors' linearization.txt
+        qpdf --encrypt --user-password=user --owner-password=owner --bits=256 -- pages.pdf locked.pdf
+        qpdf --requires-password locked.pdf
+        qpdf --show-encryption --password=owner locked.pdf > encryption.txt
+        grep -Fqx 'R = 6' encryption.txt
+        qpdf --password=user --decrypt locked.pdf unlocked.pdf
+        test "$(qpdf --show-npages unlocked.pdf)" = 2
