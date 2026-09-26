@@ -1,0 +1,18 @@
+Pyphen 0.18.1 includes hyphenation dictionaries from LibreOffice, in
+pyphen/dictionaries/. Each has its own license, stated in a README_hyph_*.txt
+file or at the top of the .dic file. A few carry no license statement:
+eo, id_ID, mr_IN, nl_NL, ru_RU and sa_IN.
+
+These dictionaries are under the GNU GPL only:
+
+  hyph_gl.dic      Galician                 GPL version 3
+  hyph_kn_IN.dic   Kannada                  GPL version 3 or later
+  hyph_uk_UA.dic   Ukrainian                GPL version 2 or later
+  hyph_cs_CZ.dic   Czech                    GPL, no version given
+  hyph_nb_NO.dic   Norwegian Bokmål         GPL, no version given
+  hyph_nn_NO.dic   Norwegian Nynorsk        GPL, no version given
+  hyph_pt_PT.dic   European Portuguese      GPL, no version given
+  hyph_ro_RO.dic   Romanian                 GPL, no version given
+
+Pyphen's COPYING.GPL is version 2 of the GPL. README_hyph_gl.txt refers to
+a copy of version 3 that is not in the wheel, so it is in COPYING.GPL-3 here.

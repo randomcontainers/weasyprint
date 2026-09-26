@@ -1,0 +1,17 @@
+Pillow 12.3.0's musllinux wheels, which the Alpine image installs, include
+libbsd and libmd from the Alpine system they are built on, because libXdmcp
+needs them. Pillow's LICENSE file covers the other libraries in the wheels
+but not these. The license files of each are in the directory of the same
+name, and the source release of the version in the wheels is listed below.
+
+pillow 12.3.0
+  https://files.pythonhosted.org/packages/f0/f4/68c491844841ede6bed70189546b3ee9731cf9f2cbad396faff5e1ccba45/pillow-12.3.0-cp314-cp314-musllinux_1_2_x86_64.whl
+  sha256:23aceaa007d6172b02c277f0cd359c79492bbb14f7072b4ede9fbcaf20648130
+  https://files.pythonhosted.org/packages/18/7e/e483414b35800b86b6f08dbbc7803fb5cd52c4d6f897f47d53ea2c7e6f65/pillow-12.3.0-cp314-cp314-musllinux_1_2_aarch64.whl
+  sha256:fe3cca2e4e8a592be0f269a1ca4835c25199d9f3ce815c8491048f785b0a0198
+libbsd 0.12.2
+  https://libbsd.freedesktop.org/releases/libbsd-0.12.2.tar.xz
+  sha256:b88cc9163d0c652aaf39a99991d974ddba1c3a9711db8f1b5838af2a14731014
+libmd 1.1.0
+  https://libbsd.freedesktop.org/releases/libmd-1.1.0.tar.xz
+  sha256:1bd6aa42275313af3141c7cf2e5b964e8b1fd488025caf2f971f43b00776b332
