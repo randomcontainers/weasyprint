@@ -13,8 +13,6 @@ docker run --rm --user "$(id -u):$(id -g)" -v "$PWD:/work" \
   ghcr.io/randomcontainers/weasyprint report.html report.pdf
 ```
 
-The same images can also be pulled as `randomcontainers.com/weasyprint`.
-
 Images, stylesheets and fonts that the HTML links with relative URLs are read from the directory of the HTML file, so keep them inside the mounted directory. Add a stylesheet with `--stylesheet`, and choose a PDF/A, PDF/UA or PDF/X variant with `--pdf-variant`:
 
 ```sh
