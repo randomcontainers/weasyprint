@@ -163,7 +163,7 @@ The SPDX expression in the image's `org.opencontainers.image.licenses` label has
 
 `latest` also contains qpdf, licensed under the Apache License 2.0. Its license files are described in the [qpdf repository](https://github.com/randomcontainers/qpdf#licenses).
 
-The files in this repository are available under the MIT license, see [LICENSE](LICENSE).
+The files in this repository are available under the MIT license, see [LICENSE](LICENSE), except the license texts in `licenses/`, which keep their own terms.
 
 ## Requesting a tool
 
